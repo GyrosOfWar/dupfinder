@@ -16,6 +16,9 @@ use crypto::sha2::Sha256;
 use crypto::digest::Digest;
 use img_hash::{ImageHash, HashType};
 
+pub mod filehasher;
+pub mod dupfinder;
+
 pub trait DuplicateFinder {
     fn find_duplicates(&mut self, folder: &Path) -> Vec<Vec<PathBuf>>;
 }
