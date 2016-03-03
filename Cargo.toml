@@ -1,14 +1,17 @@
 [package]
+authors = ["Martin Tomasi <martin.tomasi@gmail.com>"]
 name = "dupfinder"
 version = "0.1.0"
-authors = ["Martin Tomasi <martin.tomasi@gmail.com>"]
 
 [dependencies]
-pbr = "0.0.4"
 argparse = "0.2.1"
+clippy = "*"
+image = "0.7.0"
+pbr = "0.0.4"
+rayon = "*"
 rust-crypto = "0.2.34"
-image = "0.5.4"
+serde = "0.7.0"
 
 [dependencies.img_hash]
-git = "https://github.com/cybergeek94/img_hash"
 features = ["rust-image"]
+git = "https://github.com/cybergeek94/img_hash"

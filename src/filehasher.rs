@@ -80,10 +80,9 @@ impl FileHasher for ImgFileHasher {
     type V = ImageHash;
 
     fn hash_file(&mut self, path: &Path) -> io::Result<ImageHash> {
-        // FIXME
+        // FIXME use map_err 
         let image = image::open(path).unwrap();
         let hash = ImageHash::hash(&image, self.hash_size, self.hash_type);
-
         Ok(hash)
     }
 }
