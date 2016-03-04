@@ -10,7 +10,8 @@ image = "0.7.0"
 pbr = "0.0.4"
 rayon = "*"
 rust-crypto = "0.2.34"
-serde = "0.7.0"
+serde = "*"
+serde_json = "*"
 
 [dependencies.img_hash]
 features = ["rust-image"]
