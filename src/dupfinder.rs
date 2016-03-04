@@ -23,22 +23,14 @@ impl From<io::Error> for Error {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Config {
-    quiet: bool,
-    verbose: bool,
-    progressbar: bool,
-    json: bool,
-}
-
-impl Default for Config {
-    fn default() -> Config {
-        Config {
-            quiet: false,
-            verbose: false,
-            progressbar: true,
-            json: false
-        }
-    }
+    pub quiet: bool,
+    pub verbose: bool,
+    pub progressbar: bool,
+    pub json: bool,
+    pub path: String,
+    pub method: String,
 }
 
 pub struct DuplicateFinder<H, K: Hash + Eq> {
@@ -49,19 +41,19 @@ pub struct DuplicateFinder<H, K: Hash + Eq> {
 }
 
 impl<H, K> DuplicateFinder<H, K> where H: FileComparer<V = K>, K: Hash + Eq {
-    pub fn new(hasher: H) -> DuplicateFinder<H, K> {
+    pub fn new(hasher: H, config: Config) -> DuplicateFinder<H, K> {
         DuplicateFinder {
             hasher: hasher,
             hashes: HashMap::new(),
-            config: Default::default(),
+            config: config,
             progressbar: None
         }
     }
 
-    pub fn find_duplicates<P>(&mut self, folder: P) -> FinderResult where P: AsRef<Path> + Clone {
+    pub fn find_duplicates(&mut self, folder: &Path) -> FinderResult {
         let mut duplicates = vec![];
         if self.config.progressbar {
-            let count = try!(fs::read_dir(folder.clone())).count();
+            let count = try!(fs::read_dir(folder)).count();
             self.progressbar = Some(ProgressBar::new(count));
         }
         
@@ -102,22 +94,24 @@ impl<H, K> DuplicateFinder<H, K> where H: FileComparer<V = K>, K: Hash + Eq {
     }
 }
 
-pub fn find_duplicates<P>(path: P, method: &str) -> FinderResult where P: AsRef<Path> {
+pub fn find_duplicates(config: Config) -> FinderResult {
+    let path = Path::new(&config.path);
+    let method: &str = &config.method;
     match method {
         "md5" => {
             let hasher = DigestFileComparer::new(Md5::new());
-            let mut df = DuplicateFinder::new(hasher);
+            let mut df = DuplicateFinder::new(hasher, config.clone());
             df.find_duplicates(path)
         },        
         "img" => {
             let hasher = ImgHashFileComparer::new(8, HashType::Gradient);
-            let mut dupfinder = DuplicateFinder::new(hasher);
-            dupfinder.find_duplicates(path)
+            let mut df = DuplicateFinder::new(hasher, config.clone());
+            df.find_duplicates(path)
         },
         "head" => {
             let hasher = FileHeadComparer::new(16);
-            let mut dupfinder = DuplicateFinder::new(hasher);
-            dupfinder.find_duplicates(path)
+            let mut df = DuplicateFinder::new(hasher, config.clone());
+            df.find_duplicates(path)
         }
         _ => Err(Error::UnknownMethod)
     }
