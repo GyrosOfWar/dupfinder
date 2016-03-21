@@ -4,14 +4,14 @@ name = "dupfinder"
 version = "0.1.0"
 
 [dependencies]
-argparse = "0.2.1"
+argparse = "*"
 clippy = "*"
-image = "0.7.0"
-pbr = "0.0.4"
+image = "*"
+pbr = "*"
 rayon = "*"
-rust-crypto = "0.2.34"
 serde = "*"
 serde_json = "*"
+murmurhash3 = "*"
 
 [dependencies.img_hash]
 features = ["rust-image"]

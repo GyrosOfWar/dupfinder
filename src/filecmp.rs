@@ -1,41 +1,35 @@
 use std::path::Path;
-use crypto::digest::Digest;
 use std::io;
 use std::io::prelude::*;
 use std::fs::File;
 use image;
 use img_hash::{ImageHash, HashType};
 use std::hash::Hash;
+use murmurhash3::murmurhash3_x64_128;
 
-pub trait FileComparer {
+pub trait FileComparer: Sync + Clone {
     type V: Hash + Eq;
     fn hash_file<P>(&mut self, path: P) -> io::Result<Self::V> where P: AsRef<Path>;
 }
 
-pub struct DigestFileComparer<D> {
-    digest: D
-}
+#[derive(Clone)]
+pub struct HashComparer;
 
-impl<D> DigestFileComparer<D> where D: Digest {
-    pub fn new(digest: D) -> DigestFileComparer<D> {
-        DigestFileComparer { digest: digest }
-    }
-}
+impl FileComparer for HashComparer {
+    type V = (u64, u64);
 
-impl<D> FileComparer for DigestFileComparer<D> where D: Digest {
-    type V = Vec<u8>;
+    fn hash_file<P>(&mut self, path: P) -> io::Result<Self::V> where P: AsRef<Path> {
+        const SEED: u64 = 0x12345678;
 
-    fn hash_file<P>(&mut self, path: P) -> io::Result<Vec<u8>> where P: AsRef<Path> {
         let mut f = try!(File::open(path));
         let mut content = vec![];
         try!(f.read_to_end(&mut content));
-        self.digest.input(&content);
-        let result = self.digest.result_str();
-        self.digest.reset();
-        Ok(result.into_bytes())
+        Ok(murmurhash3_x64_128(&content, SEED))
     }
 }
 
+
+#[derive(Clone)]
 pub struct FileHeadComparer {
     head_len: usize
 }
@@ -62,6 +56,7 @@ impl FileComparer for FileHeadComparer {
     }
 }
 
+#[derive(Clone)]
 pub struct ImgHashFileComparer {
     hash_size: u32,
     hash_type: HashType

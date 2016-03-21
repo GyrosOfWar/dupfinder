@@ -6,8 +6,9 @@ use std::fs;
 use std::path::{PathBuf, Path};
 use std::collections::hash_map::Entry;
 use pbr::ProgressBar;
-use crypto::md5::Md5;
 use img_hash::HashType;
+use rayon::prelude::*;
+use std::sync::{Arc, Mutex};
 
 pub type FinderResult = Result<Vec<Vec<PathBuf>>, Error>;
 
@@ -31,66 +32,64 @@ pub struct Config {
     pub json: bool,
     pub path: String,
     pub method: String,
+    pub filter: Vec<String>,
 }
 
-pub struct DuplicateFinder<H, K: Hash + Eq> {
+pub struct DuplicateFinder<H> {
     hasher: H,
-    hashes: HashMap<K, PathBuf>,
     config: Config,
     progressbar: Option<ProgressBar>
 }
 
-impl<H, K> DuplicateFinder<H, K> where H: FileComparer<V = K>, K: Hash + Eq {
-    pub fn new(hasher: H, config: Config) -> DuplicateFinder<H, K> {
+fn collect_files(folder: &Path) -> io::Result<Vec<PathBuf>> {
+    let files = try!(fs::read_dir(folder));
+    files.map(|f| f.and_then(|g| Ok(g.path()))).collect()
+}
+
+impl<H, K> DuplicateFinder<H> where H: FileComparer<V = K>, K: Hash + Eq + Send + Sync {
+    pub fn new(hasher: H, config: Config) -> DuplicateFinder<H> {
         DuplicateFinder {
             hasher: hasher,
-            hashes: HashMap::new(),
             config: config,
             progressbar: None
         }
     }
 
     pub fn find_duplicates(&mut self, folder: &Path) -> FinderResult {
-        let mut duplicates = vec![];
+        let mut ddupp = vec![];
+        let files = try!(collect_files(folder));
         if self.config.progressbar {
-            let count = try!(fs::read_dir(folder)).count();
+            let count = files.len();
             self.progressbar = Some(ProgressBar::new(count));
         }
-        
-        for file in try!(fs::read_dir(folder)) {
-            let file = try!(file);
-            let path = file.path();
-
-            // TODO implement FileFilter or something
-            if path.is_dir() {
-                continue;
-            }
-
-            let hash = match self.hasher.hash_file(&path) {
-                Ok(h) => h,
-                Err(why) => {
-                    if !self.config.quiet {
-                        println!("Error reading file: {:?}: {}", file.path(), why);
-                    }
-                    continue;
-                }
-            };
-
-            match self.hashes.entry(hash) {
-                Entry::Occupied(e) => {
-                    duplicates.push(vec![path, e.get().clone()]);
+        let file_hashes = files.into_par_iter().map(|path| {
+            let mut h = self.hasher.clone();
+            h.hash_file(path.clone()).and_then(|h| Ok((path, h)))
+        }); 
+        let data = HashMap::new();
+        let duplicates = Arc::new(Mutex::new(data));
+        file_hashes.for_each(|res| {
+            let (path, hash) = res.unwrap();
+            let mut map = duplicates.lock().unwrap();
+            match map.entry(hash) {
+                Entry::Occupied(ref mut e) => {
+                    let p: &mut Vec<PathBuf> = e.get_mut(); 
+                    p.push(path);
                 }
                 Entry::Vacant(e) => {
-                    e.insert(path);
+                    e.insert(vec![path]);
                 }
             }
-            
-            if let Some(ref mut pb) = self.progressbar {
-                pb.inc();
+        });
+        
+        let dups = duplicates.lock().unwrap();
+        for (_, paths) in dups.iter() {
+            if paths.len() > 1 {
+                ddupp.push(paths.clone());
             }
         }
-
-        Ok(duplicates)
+        
+        Ok(ddupp)
     }
 }
 
@@ -98,8 +97,8 @@ pub fn find_duplicates(config: Config) -> FinderResult {
     let path = Path::new(&config.path);
     let method: &str = &config.method;
     match method {
-        "md5" => {
-            let hasher = DigestFileComparer::new(Md5::new());
+        "mr3" => {
+            let hasher = HashComparer;
             let mut df = DuplicateFinder::new(hasher, config.clone());
             df.find_duplicates(path)
         },        

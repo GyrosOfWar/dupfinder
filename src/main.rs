@@ -3,72 +3,87 @@
 
 extern crate pbr;
 extern crate argparse;
-extern crate crypto;
+extern crate murmurhash3;
 extern crate img_hash;
 extern crate image;
 extern crate rayon;
 extern crate serde;
 extern crate serde_json;
 
-use std::path::Path;
-use filecmp::*;
 use dupfinder::*;
-use crypto::md5::Md5;
-use img_hash::HashType;
-use argparse::{ArgumentParser, Store};
+use argparse::{ArgumentParser, Store, StoreTrue};
+use std::path::PathBuf;
 
 mod filecmp;
 mod dupfinder;
 
 pub fn parse_args() -> Config {
-    let mut path = ".".to_owned();
-    let mut hasher = "md5".to_owned();
-    let mut quiet = false;
-    let mut verbose = false;
+    let mut config = Config {
+        quiet: false,
+        verbose: false,
+        json: false,
+        path: ".".to_owned(),
+        method: "md5".to_owned(),
+        progressbar: false,
+        filter: vec![]
+    }; 
     {
         let mut parser = ArgumentParser::new();
         parser.set_description("Counts duplicate files in a directory.");
-        parser.refer(&mut hasher)
+        parser.refer(&mut config.method)
             .add_option(&["-h", "--hasher"], Store,
                         "Specify hasher to be used. Options are md5, img and head.");
-        parser.refer(&mut path)
+        parser.refer(&mut config.path)
             .add_argument("path", Store, "Path to search");
-        parser.refer(&mut quiet)
-            .add_option(&["-q", "--quiet"], Store, "No console output");
-        parser.refer(&mut verbose)
-            .add_option(&["-v", "--verbose"], Store, "A lot of console output");
-        
+        parser.refer(&mut config.quiet)
+            .add_option(&["-q", "--quiet"], StoreTrue, "No console output");
+        parser.refer(&mut config.verbose)
+            .add_option(&["-v", "--verbose"], StoreTrue, "A lot of console output");
+        parser.refer(&mut config.json)
+            .add_option(&["--json"], StoreTrue, "Output as JSON");
+        // parser.refer(&mut )
         parser.parse_args_or_exit();
     }
-    Config {
-        quiet: quiet,
-        verbose: verbose,
-        progressbar: true,
-        json: false,
-        path: path,
-        method: hasher, 
+    
+    config
+}
+
+fn normal_output(duplicates: &[Vec<PathBuf>]) -> String {
+    let mut t = String::new();
+    for set in duplicates {
+        let mut s = String::new();
+        s.push('[');
+        for path in set {
+            s.push_str(&format!("{}, ", path.to_string_lossy()));
+        }
+        s.pop();
+        s.pop();
+        s.push(']');
+        
+        t.push_str(&s);
+        t.push('\n');
     }
+    
+    t
+}
+
+fn json_output(duplicates: &[Vec<PathBuf>]) -> String {
+    serde_json::to_string(&duplicates).unwrap()
 }
 
 fn main() {
     let config = parse_args();
-    let duplicates = find_duplicates(config).unwrap();
+    let duplicates = find_duplicates(config.clone()).unwrap();
 
     if duplicates.is_empty() {
         println!("No duplicates found!");
     }
-    else {
-        for set in duplicates {
-            let mut s = String::new();
-            s.push('[');
-            for path in set {
-                s.push_str(&format!("{}, ", path.to_string_lossy()));
-            }
-            s.pop();
-            s.pop();
-            s.push(']');
-
-            println!("{}", s);
+    else if !config.quiet {
+        println!("Found duplicates:");
+        if config.json {
+            println!("{}", json_output(&duplicates));
+        } else {
+            println!("{}", normal_output(&duplicates));
         }
     }
 }
