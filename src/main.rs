@@ -9,6 +9,7 @@ extern crate image;
 extern crate rayon;
 extern crate serde;
 extern crate serde_json;
+extern crate crossbeam;
 
 use dupfinder::*;
 use argparse::{ArgumentParser, Store, StoreTrue};

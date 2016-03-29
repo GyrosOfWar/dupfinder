@@ -12,6 +12,7 @@ rayon = "*"
 serde = "*"
 serde_json = "*"
 murmurhash3 = "*"
+crossbeam = "*"
 
 [dependencies.img_hash]
 features = ["rust-image"]

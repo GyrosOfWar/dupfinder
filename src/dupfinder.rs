@@ -1,14 +1,15 @@
 use std::hash::Hash;
 use filecmp::*;
 use std::collections::HashMap;
-use std::io;
-use std::fs;
+use std::{io, fs, thread};
 use std::path::{PathBuf, Path};
 use std::collections::hash_map::Entry;
 use pbr::ProgressBar;
 use img_hash::HashType;
 use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
+use crossbeam::sync::MsQueue;
+use crossbeam::scope;
 
 pub type FinderResult = Result<Vec<Vec<PathBuf>>, Error>;
 
@@ -38,7 +39,6 @@ pub struct Config {
 pub struct DuplicateFinder<H> {
     hasher: H,
     config: Config,
-    progressbar: Option<ProgressBar>
 }
 
 fn collect_files(folder: &Path) -> io::Result<Vec<PathBuf>> {
@@ -46,26 +46,39 @@ fn collect_files(folder: &Path) -> io::Result<Vec<PathBuf>> {
     files.map(|f| f.and_then(|g| Ok(g.path()))).collect()
 }
 
-impl<H, K> DuplicateFinder<H> where H: FileComparer<V = K>, K: Hash + Eq + Send + Sync {
+impl<H, K> DuplicateFinder<H>
+    where H: FileComparer<V = K>,
+          K: Hash + Eq + Send + Sync
+{
     pub fn new(hasher: H, config: Config) -> DuplicateFinder<H> {
         DuplicateFinder {
             hasher: hasher,
             config: config,
-            progressbar: None
         }
     }
 
     pub fn find_duplicates(&mut self, folder: &Path) -> FinderResult {
         let mut ddupp = vec![];
         let files = try!(collect_files(folder));
-        if self.config.progressbar {
-            let count = files.len();
-            self.progressbar = Some(ProgressBar::new(count));
-        }
+        let count = files.len();
+        let queue = MsQueue::new();
+        scope(|s| {
+            s.spawn(|| {
+                let mut pb = ProgressBar::new(count as u64);
+                loop {
+                    println!("Thread!");
+                    if queue.pop() {
+                        pb.inc();
+                    } else {
+                        break;
+                    }
+                }
+            })
+        });
         let file_hashes = files.into_par_iter().map(|path| {
             let mut h = self.hasher.clone();
             h.hash_file(path.clone()).and_then(|h| Ok((path, h)))
-        }); 
+        });
         let data = HashMap::new();
         let duplicates = Arc::new(Mutex::new(data));
         file_hashes.for_each(|res| {
@@ -73,22 +86,25 @@ impl<H, K> DuplicateFinder<H> where H: FileComparer<V = K>, K: Hash + Eq + Send 
             let mut map = duplicates.lock().unwrap();
             match map.entry(hash) {
                 Entry::Occupied(ref mut e) => {
-                    let p: &mut Vec<PathBuf> = e.get_mut(); 
+                    let p: &mut Vec<PathBuf> = e.get_mut();
                     p.push(path);
                 }
                 Entry::Vacant(e) => {
                     e.insert(vec![path]);
                 }
             }
+
+            queue.push(true);
         });
-        
+
         let dups = duplicates.lock().unwrap();
         for (_, paths) in dups.iter() {
             if paths.len() > 1 {
                 ddupp.push(paths.clone());
             }
         }
-        
+        queue.push(false);
+
         Ok(ddupp)
     }
 }
@@ -101,17 +117,17 @@ pub fn find_duplicates(config: Config) -> FinderResult {
             let hasher = HashComparer;
             let mut df = DuplicateFinder::new(hasher, config.clone());
             df.find_duplicates(path)
-        },        
+        }        
         "img" => {
             let hasher = ImgHashFileComparer::new(8, HashType::Gradient);
             let mut df = DuplicateFinder::new(hasher, config.clone());
             df.find_duplicates(path)
-        },
+        }
         "head" => {
             let hasher = FileHeadComparer::new(16);
             let mut df = DuplicateFinder::new(hasher, config.clone());
             df.find_duplicates(path)
         }
-        _ => Err(Error::UnknownMethod)
+        _ => Err(Error::UnknownMethod),
     }
 }
