@@ -1,7 +1,3 @@
-#![feature(plugin)]
-#![plugin(clippy)]
-
-extern crate pbr;
 extern crate argparse;
 extern crate murmurhash3;
 extern crate img_hash;
@@ -10,6 +6,7 @@ extern crate rayon;
 extern crate serde;
 extern crate serde_json;
 extern crate crossbeam;
+extern crate walkdir;
 
 use dupfinder::*;
 use argparse::{ArgumentParser, Store, StoreTrue};
@@ -18,31 +15,36 @@ use std::path::PathBuf;
 mod filecmp;
 mod dupfinder;
 
+use std::io::prelude::*;
+use std::fs::File;
+
 pub fn parse_args() -> Config {
     let mut config = Config {
-        quiet: false,
         verbose: false,
         json: false,
-        path: ".".to_owned(),
-        method: "md5".to_owned(),
+        path: ".".into(),
+        method: "mur".into(),
         progressbar: false,
-        filter: vec![]
+        out_path: "".into(),
+        recursive: false,
     }; 
     {
         let mut parser = ArgumentParser::new();
         parser.set_description("Counts duplicate files in a directory.");
         parser.refer(&mut config.method)
-            .add_option(&["-h", "--hasher"], Store,
-                        "Specify hasher to be used. Options are md5, img and head.");
+            .add_option(&["-m", "--method"], Store,
+                        "Hashing method to be used. Defaults to MurmurHash3. (img, mur, head)");
         parser.refer(&mut config.path)
             .add_argument("path", Store, "Path to search");
-        parser.refer(&mut config.quiet)
-            .add_option(&["-q", "--quiet"], StoreTrue, "No console output");
         parser.refer(&mut config.verbose)
             .add_option(&["-v", "--verbose"], StoreTrue, "A lot of console output");
         parser.refer(&mut config.json)
             .add_option(&["--json"], StoreTrue, "Output as JSON");
-        // parser.refer(&mut )
+        parser.refer(&mut config.out_path)
+            .add_option(&["-o", "--out"], Store, "Output path");
+        parser.refer(&mut config.recursive)
+            .add_option(&["-r", "--recursive"], StoreTrue, "Recurse into subdirectories");
+            
         parser.parse_args_or_exit();
     }
     
@@ -76,15 +78,16 @@ fn main() {
     let config = parse_args();
     let duplicates = find_duplicates(config.clone()).unwrap();
 
-    if duplicates.is_empty() {
-        println!("No duplicates found!");
-    }
-    else if !config.quiet {
-        println!("Found duplicates:");
-        if config.json {
-            println!("{}", json_output(&duplicates));
-        } else {
-            println!("{}", normal_output(&duplicates));
-        }
+    let output = if config.json {
+        json_output(&duplicates)
+    } else {
+        normal_output(&duplicates)
+    };
+
+    if config.out_path.len() > 0 {
+        let mut f = File::create(config.out_path).unwrap();
+        write!(f, "{}", output).unwrap();
+    } else {
+        println!("{}", output);
     }
 }

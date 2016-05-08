@@ -5,14 +5,13 @@ version = "0.1.0"
 
 [dependencies]
 argparse = "*"
-clippy = "*"
 image = "*"
-pbr = "*"
 rayon = "*"
 serde = "*"
 serde_json = "*"
 murmurhash3 = "*"
 crossbeam = "*"
+walkdir = "*"
 
 [dependencies.img_hash]
 features = ["rust-image"]
