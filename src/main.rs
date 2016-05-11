@@ -27,27 +27,30 @@ pub fn parse_args() -> Config {
         progressbar: false,
         out_path: "".into(),
         recursive: false,
-    }; 
+    };
     {
         let mut parser = ArgumentParser::new();
         parser.set_description("Counts duplicate files in a directory.");
         parser.refer(&mut config.method)
-            .add_option(&["-m", "--method"], Store,
-                        "Hashing method to be used. Defaults to MurmurHash3. (img, mur, head)");
+              .add_option(&["-m", "--method"],
+                          Store,
+                          "Hashing method to be used. Defaults to MurmurHash3. (img, mur, head)");
         parser.refer(&mut config.path)
-            .add_argument("path", Store, "Path to search");
+              .add_argument("path", Store, "Path to search");
         parser.refer(&mut config.verbose)
-            .add_option(&["-v", "--verbose"], StoreTrue, "A lot of console output");
+              .add_option(&["-v", "--verbose"], StoreTrue, "A lot of console output");
         parser.refer(&mut config.json)
-            .add_option(&["--json"], StoreTrue, "Output as JSON");
+              .add_option(&["--json"], StoreTrue, "Output as JSON");
         parser.refer(&mut config.out_path)
-            .add_option(&["-o", "--out"], Store, "Output path");
+              .add_option(&["-o", "--out"], Store, "Output path");
         parser.refer(&mut config.recursive)
-            .add_option(&["-r", "--recursive"], StoreTrue, "Recurse into subdirectories");
-            
+              .add_option(&["-r", "--recursive"],
+                          StoreTrue,
+                          "Recurse into subdirectories");
+
         parser.parse_args_or_exit();
     }
-    
+
     config
 }
 
@@ -57,21 +60,31 @@ fn normal_output(duplicates: &[Vec<PathBuf>]) -> String {
         let mut s = String::new();
         s.push('[');
         for path in set {
-            s.push_str(&format!("{}, ", path.to_string_lossy()));
+            let name = path.file_name().unwrap().to_string_lossy();
+            s.push_str(&format!("{}, ", name));
         }
         s.pop();
         s.pop();
         s.push(']');
-        
+
         t.push_str(&s);
         t.push('\n');
     }
-    
+
     t
 }
-
+// TODO add option for long/short filename output
+// TODO add option for a tolerance when using image hashing
 fn json_output(duplicates: &[Vec<PathBuf>]) -> String {
-    serde_json::to_string(&duplicates).unwrap()
+    let paths: Vec<Vec<_>> = duplicates.iter()
+                                       .map(|lst| {
+                                           lst.iter()
+                                              .map(|p| p.file_name().unwrap().to_str().unwrap())
+                                              .collect()
+                                       })
+                                       .collect();
+
+    serde_json::to_string(&paths).unwrap()
 }
 
 fn main() {

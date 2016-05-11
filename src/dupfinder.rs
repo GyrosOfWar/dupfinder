@@ -47,11 +47,11 @@ fn collect_files(folder: &Path, recursive: bool) -> io::Result<Vec<PathBuf>> {
         for f in wd {
             files.push(try!(f).path().into());
         }
-        
+
         Ok(files)
     } else {
         let files = try!(fs::read_dir(folder));
-        files.map(|f| f.and_then(|g| Ok(g.path()))).collect() 
+        files.map(|f| f.and_then(|g| Ok(g.path()))).collect()
     }
 }
 
@@ -72,7 +72,7 @@ impl<H, K> DuplicateFinder<H>
         let file_hashes = files.into_par_iter().map(|path| {
             let mut h = self.hasher.clone();
             if self.config.verbose {
-                println!("Hashing file {:?}", path);
+                println!("Hashing file {:?}", path.file_name());
             }
             h.hash_file(path.clone()).and_then(|h| Ok((path, h)))
         });
@@ -132,10 +132,11 @@ pub enum DeletionStrategy {
     Newest,
     Biggest,
     Smallest,
-    
 }
 
 
-pub fn delete_duplicates(duplicates: FinderResult, strategy: DeletionStrategy) -> io::Result<Vec<PathBuf>> {
+pub fn delete_duplicates(duplicates: FinderResult,
+                         strategy: DeletionStrategy)
+                         -> io::Result<Vec<PathBuf>> {
     unimplemented!()
 }
