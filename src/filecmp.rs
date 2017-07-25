@@ -3,13 +3,16 @@ use std::io;
 use std::io::prelude::*;
 use std::fs::File;
 use image;
-use img_hash::{ImageHash, HashType};
+use img_hash::{HashType, ImageHash};
 use std::hash::Hash;
 use murmurhash3::murmurhash3_x64_128;
 
 pub trait FileComparer: Sync + Clone {
     type V: Hash + Eq;
-    fn hash_file<P>(&mut self, path: P) -> io::Result<Self::V> where P: AsRef<Path>;
+
+    fn hash_file<P>(&mut self, path: P) -> io::Result<Self::V>
+    where
+        P: AsRef<Path>;
 }
 
 #[derive(Clone)]
@@ -19,7 +22,8 @@ impl FileComparer for HashComparer {
     type V = (u64, u64);
 
     fn hash_file<P>(&mut self, path: P) -> io::Result<Self::V>
-        where P: AsRef<Path>
+    where
+        P: AsRef<Path>,
     {
         const SEED: u64 = 0x12345678;
 
@@ -46,7 +50,8 @@ impl FileComparer for FileHeadComparer {
     type V = Vec<u8>;
 
     fn hash_file<P>(&mut self, path: P) -> io::Result<Vec<u8>>
-        where P: AsRef<Path>
+    where
+        P: AsRef<Path>,
     {
         let f = try!(File::open(path));
         let mut result = vec![];
@@ -69,8 +74,8 @@ pub struct ImgHashFileComparer {
 impl ImgHashFileComparer {
     pub fn new(hash_size: u32, hash_type: HashType) -> ImgHashFileComparer {
         ImgHashFileComparer {
-            hash_size: hash_size,
-            hash_type: hash_type,
+            hash_size,
+            hash_type,
         }
     }
 }
@@ -79,7 +84,8 @@ impl FileComparer for ImgHashFileComparer {
     type V = ImageHash;
 
     fn hash_file<P>(&mut self, path: P) -> io::Result<ImageHash>
-        where P: AsRef<Path>
+    where
+        P: AsRef<Path>,
     {
         // FIXME use map_err
         let image = image::open(path).unwrap();

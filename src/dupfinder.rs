@@ -1,8 +1,8 @@
 use std::hash::Hash;
 use filecmp::*;
 use std::collections::HashMap;
-use std::{io, fs};
-use std::path::{PathBuf, Path};
+use std::{fs, io};
+use std::path::{Path, PathBuf};
 use std::collections::hash_map::Entry;
 use img_hash::HashType;
 use rayon::prelude::*;
@@ -56,8 +56,9 @@ fn collect_files(folder: &Path, recursive: bool) -> io::Result<Vec<PathBuf>> {
 }
 
 impl<H, K> DuplicateFinder<H>
-    where H: FileComparer<V = K>,
-          K: Hash + Eq + Send + Sync
+where
+    H: FileComparer<V = K>,
+    K: Hash + Eq + Send + Sync,
 {
     pub fn new(hasher: H, config: Config) -> DuplicateFinder<H> {
         DuplicateFinder {
@@ -78,17 +79,15 @@ impl<H, K> DuplicateFinder<H>
         });
         let data = HashMap::new();
         let duplicates = Arc::new(Mutex::new(data));
-        file_hashes.for_each(|res| {
-            if let Ok((path, hash)) = res {
-                let mut map = duplicates.lock().unwrap();
-                match map.entry(hash) {
-                    Entry::Occupied(ref mut e) => {
-                        let p: &mut Vec<PathBuf> = e.get_mut();
-                        p.push(path);
-                    }
-                    Entry::Vacant(e) => {
-                        e.insert(vec![path]);
-                    }
+        file_hashes.for_each(|res| if let Ok((path, hash)) = res {
+            let mut map = duplicates.lock().unwrap();
+            match map.entry(hash) {
+                Entry::Occupied(ref mut e) => {
+                    let p: &mut Vec<PathBuf> = e.get_mut();
+                    p.push(path);
+                }
+                Entry::Vacant(e) => {
+                    e.insert(vec![path]);
                 }
             }
         });
@@ -104,7 +103,7 @@ impl<H, K> DuplicateFinder<H>
     }
 }
 
-pub fn find_duplicates(config: Config) -> FinderResult {
+pub fn find_duplicates(config: &Config) -> FinderResult {
     let path = Path::new(&config.path);
     let method: &str = &config.method;
     match method {
@@ -127,16 +126,16 @@ pub fn find_duplicates(config: Config) -> FinderResult {
     }
 }
 
-pub enum DeletionStrategy {
-    Oldest,
-    Newest,
-    Biggest,
-    Smallest,
-}
+// pub enum DeletionStrategy {
+//     Oldest,
+//     Newest,
+//     Biggest,
+//     Smallest,
+// }
 
-
-pub fn delete_duplicates(duplicates: FinderResult,
-                         strategy: DeletionStrategy)
-                         -> io::Result<Vec<PathBuf>> {
-    unimplemented!()
-}
+// pub fn delete_duplicates(
+//     duplicates: FinderResult,
+//     strategy: DeletionStrategy,
+// ) -> io::Result<Vec<PathBuf>> {
+//     unimplemented!()
+// }
