@@ -1,9 +1,7 @@
-#![feature(conservative_impl_trait)]
-
 extern crate structopt;
 #[macro_use]
 extern crate structopt_derive;
-extern crate murmurhash3;
+extern crate twox_hash;
 extern crate img_hash;
 extern crate image;
 extern crate rayon;
@@ -14,6 +12,7 @@ extern crate walkdir;
 #[macro_use]
 extern crate failure;
 extern crate parking_lot;
+extern crate byteorder;
 
 use std::io::prelude::*;
 use std::fs::File;
@@ -52,23 +51,20 @@ fn json_output(duplicates: &[Vec<PathBuf>]) -> String {
 }
 
 fn run(config: Config) -> Result<()> {
+    let mut df = DuplicateFinder::new(config.clone());
     let path = Path::new(&config.path);
-    // let hasher = config.method.get_comparer();
-
-    // let duplicates = find_duplicates(&config)?;
-
-    // let output = if config.json {
-    //     json_output(&duplicates)
-    // } else {
-    //     normal_output(&duplicates)
-    // };
-
-    // if !config.out_path.is_empty() {
-    //     let mut f = File::create(config.out_path).unwrap();
-    //     write!(f, "{}", output).unwrap();
-    // } else {
-    //     println!("{}", output);
-    // }
+    let duplicates = df.find_duplicates(path)?;
+    let output = if config.json {
+        json_output(&duplicates)
+    } else {
+        normal_output(&duplicates)
+    };
+    if let Some(path) = config.out_path {
+        let mut file = File::create(path)?;
+        write!(file, "{}", output)?;
+    } else {
+        println!("{}", output);
+    }
     Ok(())
 }
 
