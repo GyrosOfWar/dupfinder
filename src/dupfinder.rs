@@ -1,36 +1,72 @@
-use std::hash::Hash;
-use filecmp::*;
-use std::collections::HashMap;
 use std::{fs, io};
-use std::path::{Path, PathBuf};
 use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+use std::hash::Hash;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::str::FromStr;
+
 use img_hash::HashType;
 use rayon::prelude::*;
-use std::sync::{Arc, Mutex};
 use walkdir::WalkDir;
+use failure::{Error};
+use parking_lot::Mutex;
 
-pub type FinderResult = Result<Vec<Vec<PathBuf>>, Error>;
+use filecmp::*;
 
-#[derive(Debug)]
-pub enum Error {
-    IoError(io::Error),
-    UnknownMethod,
+pub type Result<T> = ::std::result::Result<T, Error>;
+
+#[derive(Debug, Clone)]
+pub enum HashAlgorithm {
+    MurmurHash,
+    ImageHash,
+    FileHead
 }
 
-impl From<io::Error> for Error {
-    fn from(err: io::Error) -> Error {
-        Error::IoError(err)
+impl FromStr for HashAlgorithm {
+    type Err = Error;
+
+    fn from_str(input: &str) -> Result<HashAlgorithm> {
+        match input {
+            "mur" => Ok(HashAlgorithm::MurmurHash),
+            "img" => Ok(HashAlgorithm::ImageHash),
+            "head" => Ok(HashAlgorithm::FileHead),
+            other => bail!("Unknown error type: {}", other)
+        }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, StructOpt)]
 pub struct Config {
+    #[structopt(
+        short = "v",
+        long = "verbose",
+        help = "More verbose output."
+    )]
     pub verbose: bool,
+    #[structopt(
+        short = "p",
+        long = "progress",
+        help = "Show a progress bar."
+    )]
     pub progressbar: bool,
+    #[structopt(
+        long = "json",
+        help = "Output data as JSON."
+    )]
     pub json: bool,
+    #[structopt(
+        name = "INPUT",
+        help = "Input path."
+    )]
     pub path: String,
-    pub method: String,
-    pub out_path: String,
+    #[structopt(
+        short = "m",
+        long = "method",
+        help = "Hashing algorithm to use"
+    )]
+    pub method: HashAlgorithm,
+    pub out_path: Option<String>,
     pub recursive: bool,
 }
 
@@ -67,7 +103,7 @@ where
         }
     }
 
-    pub fn find_duplicates(&mut self, folder: &Path) -> FinderResult {
+    pub fn find_duplicates(&mut self, folder: &Path) -> Result<Vec<Vec<PathBuf>>> {
         let mut dup_vec = vec![];
         let files = try!(collect_files(folder, self.config.recursive));
         let file_hashes = files.into_par_iter().map(|path| {
@@ -80,7 +116,7 @@ where
         let data = HashMap::new();
         let duplicates = Arc::new(Mutex::new(data));
         file_hashes.for_each(|res| if let Ok((path, hash)) = res {
-            let mut map = duplicates.lock().unwrap();
+            let mut map = duplicates.lock();
             match map.entry(hash) {
                 Entry::Occupied(ref mut e) => {
                     let p: &mut Vec<PathBuf> = e.get_mut();
@@ -92,7 +128,7 @@ where
             }
         });
 
-        let dups = duplicates.lock().unwrap();
+        let dups = duplicates.lock();
         for (_, paths) in dups.iter() {
             if paths.len() > 1 {
                 dup_vec.push(paths.clone());
@@ -103,39 +139,25 @@ where
     }
 }
 
-pub fn find_duplicates(config: &Config) -> FinderResult {
-    let path = Path::new(&config.path);
-    let method: &str = &config.method;
-    match method {
-        "mur" => {
-            let hasher = HashComparer;
-            let mut df = DuplicateFinder::new(hasher, config.clone());
-            df.find_duplicates(path)
-        }        
-        "img" => {
-            let hasher = ImgHashFileComparer::new(8, HashType::Gradient);
-            let mut df = DuplicateFinder::new(hasher, config.clone());
-            df.find_duplicates(path)
-        }
-        "head" => {
-            let hasher = FileHeadComparer::new(16);
-            let mut df = DuplicateFinder::new(hasher, config.clone());
-            df.find_duplicates(path)
-        }
-        _ => Err(Error::UnknownMethod),
-    }
-}
-
-// pub enum DeletionStrategy {
-//     Oldest,
-//     Newest,
-//     Biggest,
-//     Smallest,
-// }
-
-// pub fn delete_duplicates(
-//     duplicates: FinderResult,
-//     strategy: DeletionStrategy,
-// ) -> io::Result<Vec<PathBuf>> {
-//     unimplemented!()
+// pub fn find_duplicates(config: &Config) -> Result {
+//     let path = Path::new(&config.path);
+//     let method: &str = &config.method;
+//     match method {
+//         "mur" => {
+//             let hasher = HashComparer;
+//             let mut df = DuplicateFinder::new(hasher, config.clone());
+//             df.find_duplicates(path)
+//         }        
+//         "img" => {
+//             let hasher = ImgHashFileComparer::new(8, HashType::Gradient);
+//             let mut df = DuplicateFinder::new(hasher, config.clone());
+//             df.find_duplicates(path)
+//         }
+//         "head" => {
+//             let hasher = FileHeadComparer::new(16);
+//             let mut df = DuplicateFinder::new(hasher, config.clone());
+//             df.find_duplicates(path)
+//         }
+//         _ => Err(format!("No such hashing method: {}", method).into()),
+//     }
 // }

@@ -2,9 +2,10 @@ use std::path::Path;
 use std::io;
 use std::io::prelude::*;
 use std::fs::File;
+use std::hash::Hash;
+
 use image;
 use img_hash::{HashType, ImageHash};
-use std::hash::Hash;
 use murmurhash3::murmurhash3_x64_128;
 
 pub trait FileComparer: Sync + Clone {
