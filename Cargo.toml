@@ -5,17 +5,17 @@ version = "0.1.0"
 
 [dependencies]
 byteorder = "*"
-crossbeam = "0.2"
+crossbeam = "0.3"
 failure = "0.1.1"
-image = "0.14"
+image = "0.18"
 parking_lot = "0.5.3"
-rayon = "0.8"
+rayon = "0.9"
 serde = "1"
 serde_json = "1"
 structopt = "0.1.6"
 structopt-derive = "0.1.6"
 twox-hash = "1.1"
-walkdir = "1"
+walkdir = "2"
 
 [dependencies.img_hash]
 features = ["rust-image"]
