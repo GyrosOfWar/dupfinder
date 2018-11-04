@@ -1,16 +1,16 @@
-use std::path::Path;
-use std::io;
-use std::io::prelude::*;
 use std::fs::File;
 use std::hash::Hasher;
-
+use std::io;
+use std::io::prelude::*;
+use std::path::Path;
 use byteorder::{WriteBytesExt, LE};
 use image;
 use img_hash::{HashType, ImageHash};
 use twox_hash;
+use error::Result;
 
 pub trait FileComparer: Sync + Clone {
-    fn hash_file<P>(&mut self, path: P, buf: &mut Vec<u8>) -> io::Result<()>
+    fn hash_file<P>(&mut self, path: P, buf: &mut Vec<u8>) -> Result<()>
     where
         P: AsRef<Path>;
 }
@@ -19,21 +19,22 @@ pub trait FileComparer: Sync + Clone {
 pub struct HashComparer;
 
 impl FileComparer for HashComparer {
-    fn hash_file<P>(&mut self, path: P, buf: &mut Vec<u8>) -> io::Result<()>
+    fn hash_file<P>(&mut self, path: P, buf: &mut Vec<u8>) -> Result<()>
     where
         P: AsRef<Path>,
     {
-        const SEED: u64 = 0x12345678;
+        const SEED: u64 = 0x1234_5678;
 
         let mut hasher = twox_hash::XxHash::with_seed(SEED);
 
         let mut file = io::BufReader::new(File::open(path)?);
         let mut file_buf = [0; 1024 * 8];
         loop {
-            match file.read(&mut file_buf) {
-                Ok(0) => break,
-                Ok(amt) => hasher.write(&file_buf[0..amt]),
-                Err(e) => return Err(e)
+            let amount = file.read(&mut file_buf)?;
+            if amount == 0 {
+                break;
+            } else {
+                hasher.write(&file_buf[..amount])
             }
         }
         let result = hasher.finish();
@@ -58,12 +59,11 @@ impl ImgHashFileComparer {
 }
 
 impl FileComparer for ImgHashFileComparer {
-    fn hash_file<P>(&mut self, path: P, buf: &mut Vec<u8>) -> io::Result<()>
+    fn hash_file<P>(&mut self, path: P, buf: &mut Vec<u8>) -> Result<()>
     where
         P: AsRef<Path>,
     {
-        // FIXME use map_err
-        let image = image::open(path).unwrap();
+        let image = image::open(path)?;
         let hash = ImageHash::hash(&image, self.hash_size, self.hash_type);
         let bits = hash.to_bytes();
         buf.write_all(&bits)?;

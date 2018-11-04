@@ -1,19 +1,17 @@
-use std::{fs, io};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::str::FromStr;
+use std::sync::Arc;
+use std::{fs, io};
 
+use failure::Error;
 use img_hash::HashType;
+use parking_lot::Mutex;
 use rayon::prelude::*;
 use walkdir::WalkDir;
-use failure::Error;
-use parking_lot::Mutex;
-
 use filecmp::*;
-
-pub type Result<T> = ::std::result::Result<T, Error>;
+use error::Result;
 
 #[derive(Debug, Clone)]
 pub enum HashAlgorithm {
@@ -22,7 +20,7 @@ pub enum HashAlgorithm {
 }
 
 impl FileComparer for HashAlgorithm {
-    fn hash_file<P>(&mut self, path: P, buf: &mut Vec<u8>) -> io::Result<()>
+    fn hash_file<P>(&mut self, path: P, buf: &mut Vec<u8>) -> Result<()>
     where
         P: AsRef<Path>,
     {
@@ -50,14 +48,23 @@ impl FromStr for HashAlgorithm {
 
 #[derive(Debug, Clone, StructOpt)]
 pub struct Config {
-    #[structopt(short = "v", long = "verbose", help = "More verbose output.")] pub verbose: bool,
+    #[structopt(short = "v", long = "verbose", help = "More verbose output.")]
+    pub verbose: bool,
+
     #[structopt(short = "p", long = "progress", help = "Show a progress bar.")]
     pub progressbar: bool,
-    #[structopt(long = "json", help = "Output data as JSON.")] pub json: bool,
-    #[structopt(name = "INPUT", help = "Input path.")] pub path: String,
+
+    #[structopt(long = "json", help = "Output data as JSON.")]
+    pub json: bool,
+
+    #[structopt(name = "INPUT", help = "Input path.")]
+    pub path: String,
+
     #[structopt(short = "m", long = "method", help = "Hashing algorithm to use")]
     pub method: HashAlgorithm,
+
     pub out_path: Option<String>,
+
     pub recursive: bool,
 }
 
@@ -83,9 +90,7 @@ fn collect_files(folder: &Path, recursive: bool) -> io::Result<Vec<PathBuf>> {
 
 impl DuplicateFinder {
     pub fn new(config: Config) -> Self {
-        DuplicateFinder {
-            config: config,
-        }
+        DuplicateFinder { config: config }
     }
 
     pub fn find_duplicates(&mut self, folder: &Path) -> Result<Vec<Vec<PathBuf>>> {
@@ -97,7 +102,8 @@ impl DuplicateFinder {
             if self.config.verbose {
                 println!("Hashing file {:?}", path.file_name());
             }
-            h.hash_file(path.clone(), &mut buf).and_then(|_| Ok((path, buf)))
+            h.hash_file(path.clone(), &mut buf)
+                .and_then(|_| Ok((path, buf)))
         });
         let data = HashMap::new();
         let duplicates = Arc::new(Mutex::new(data));
@@ -126,26 +132,3 @@ impl DuplicateFinder {
         Ok(dup_vec)
     }
 }
-
-// pub fn find_duplicates(config: &Config) -> Result {
-//     let path = Path::new(&config.path);
-//     let method: &str = &config.method;
-//     match method {
-//         "mur" => {
-//             let hasher = HashComparer;
-//             let mut df = DuplicateFinder::new(hasher, config.clone());
-//             df.find_duplicates(path)
-//         }
-//         "img" => {
-//             let hasher = ImgHashFileComparer::new(8, HashType::Gradient);
-//             let mut df = DuplicateFinder::new(hasher, config.clone());
-//             df.find_duplicates(path)
-//         }
-//         "head" => {
-//             let hasher = FileHeadComparer::new(16);
-//             let mut df = DuplicateFinder::new(hasher, config.clone());
-//             df.find_duplicates(path)
-//         }
-//         _ => Err(format!("No such hashing method: {}", method).into()),
-//     }
-// }
