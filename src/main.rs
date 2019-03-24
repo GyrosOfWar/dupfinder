@@ -1,29 +1,20 @@
-extern crate structopt;
-#[macro_use]
-extern crate structopt_derive;
-extern crate crossbeam;
-extern crate image;
-extern crate img_hash;
-extern crate rayon;
-extern crate serde;
-extern crate serde_json;
-extern crate twox_hash;
-extern crate walkdir;
 #[macro_use]
 extern crate failure;
-extern crate byteorder;
-extern crate parking_lot;
+#[macro_use]
+extern crate structopt_derive;
 
+use crate::dupfinder::*;
+use crate::error::Result;
+use serde_json;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
+use structopt;
 use structopt::StructOpt;
-use crate::dupfinder::*;
-use crate::error::Result;
 
 mod dupfinder;
-mod filecmp;
 mod error;
+mod filecmp;
 
 fn normal_output(duplicates: &[Vec<PathBuf>]) -> String {
     let mut t = String::new();

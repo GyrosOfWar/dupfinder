@@ -5,13 +5,13 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::{fs, io};
 
+use crate::error::Result;
+use crate::filecmp::*;
 use failure::Error;
 use img_hash::HashType;
 use parking_lot::Mutex;
 use rayon::prelude::*;
 use walkdir::WalkDir;
-use crate::filecmp::*;
-use crate::error::Result;
 
 #[derive(Debug, Clone)]
 pub enum HashAlgorithm {
@@ -90,7 +90,7 @@ fn collect_files(folder: &Path, recursive: bool) -> io::Result<Vec<PathBuf>> {
 
 impl DuplicateFinder {
     pub fn new(config: Config) -> Self {
-        DuplicateFinder { config: config }
+        DuplicateFinder { config }
     }
 
     pub fn find_duplicates(&mut self, folder: &Path) -> Result<Vec<Vec<PathBuf>>> {

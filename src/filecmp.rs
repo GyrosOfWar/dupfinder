@@ -1,13 +1,13 @@
+use crate::error::Result;
+use byteorder::{WriteBytesExt, LE};
+use image;
+use img_hash::{HashType, ImageHash};
 use std::fs::File;
 use std::hash::Hasher;
 use std::io;
 use std::io::prelude::*;
 use std::path::Path;
-use byteorder::{WriteBytesExt, LE};
-use image;
-use img_hash::{HashType, ImageHash};
 use twox_hash;
-use crate::error::Result;
 
 pub trait FileComparer: Sync + Clone {
     fn hash_file<P>(&mut self, path: P, buf: &mut Vec<u8>) -> Result<()>
