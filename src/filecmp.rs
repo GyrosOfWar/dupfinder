@@ -7,7 +7,7 @@ use byteorder::{WriteBytesExt, LE};
 use image;
 use img_hash::{HashType, ImageHash};
 use twox_hash;
-use error::Result;
+use crate::error::Result;
 
 pub trait FileComparer: Sync + Clone {
     fn hash_file<P>(&mut self, path: P, buf: &mut Vec<u8>) -> Result<()>

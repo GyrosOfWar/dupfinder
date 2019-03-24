@@ -18,8 +18,8 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
-use dupfinder::*;
-use error::Result;
+use crate::dupfinder::*;
+use crate::error::Result;
 
 mod dupfinder;
 mod filecmp;

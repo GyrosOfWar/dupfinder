@@ -10,8 +10,8 @@ use img_hash::HashType;
 use parking_lot::Mutex;
 use rayon::prelude::*;
 use walkdir::WalkDir;
-use filecmp::*;
-use error::Result;
+use crate::filecmp::*;
+use crate::error::Result;
 
 #[derive(Debug, Clone)]
 pub enum HashAlgorithm {
@@ -78,12 +78,12 @@ fn collect_files(folder: &Path, recursive: bool) -> io::Result<Vec<PathBuf>> {
         let mut files = vec![];
 
         for f in wd {
-            files.push(try!(f).path().into());
+            files.push(r#try!(f).path().into());
         }
 
         Ok(files)
     } else {
-        let files = try!(fs::read_dir(folder));
+        let files = r#try!(fs::read_dir(folder));
         files.map(|f| f.and_then(|g| Ok(g.path()))).collect()
     }
 }
@@ -95,7 +95,7 @@ impl DuplicateFinder {
 
     pub fn find_duplicates(&mut self, folder: &Path) -> Result<Vec<Vec<PathBuf>>> {
         let mut dup_vec = vec![];
-        let files = try!(collect_files(folder, self.config.recursive));
+        let files = r#try!(collect_files(folder, self.config.recursive));
         let file_hashes = files.into_par_iter().map(|path| {
             let mut h = self.config.method.clone();
             let mut buf = vec![];
